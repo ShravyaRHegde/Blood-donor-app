@@ -1,0 +1,46 @@
+{
+  "rules": {
+    "_comment_demo": "Open rules for the demo. Tighten to the per-collection rules below before any real-world deployment.",
+    ".read":  true,
+    ".write": true,
+
+    "_production_template": {
+      "_note": "Replace the top-level .read/.write above with this nested template for production.",
+      "users": {
+        "$uid": {
+          ".read":  "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      },
+      "donors": {
+        ".read":  true,
+        ".write": "auth != null",
+        "$tokenId": {
+          ".validate": "newData.hasChildren(['id','ownerEmail','name','bloodGroup','location','phone','createdAt'])"
+        }
+      },
+      "receivers": {
+        ".read":  true,
+        ".write": "auth != null",
+        "$tokenId": {
+          ".validate": "newData.hasChildren(['id','ownerEmail','name','bloodGroup','location','phone','cause','unitsNeeded','createdAt'])"
+        }
+      },
+      "requests": {
+        ".read":  true,
+        ".write": "auth != null",
+        "$reqId": {
+          ".validate": "newData.hasChildren(['id','donorTokenId','receiverTokenId','senderEmail','recipientEmail','status','createdAt','updatedAt'])"
+        }
+      },
+      "counters": {
+        ".read":  "auth != null",
+        ".write": "auth != null"
+      },
+      "meta": {
+        ".read":  true,
+        ".write": "auth != null"
+      }
+    }
+  }
+}

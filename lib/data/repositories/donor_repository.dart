@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../core/utils/id_generator.dart';
 import '../models/donor_model.dart';
 
 class DonorRepository {
-  CollectionReference<Map<String, dynamic>> get _col =>
-      FirebaseFirestore.instance.collection('donors');
+  DatabaseReference get _ref => FirebaseDatabase.instance.ref('donors');
 
   Future<DonorToken> create({
     required String ownerEmail,
@@ -26,15 +25,18 @@ class DonorRepository {
       lastDonationDate: lastDonationDate,
       createdAt: DateTime.now(),
     );
-    await _col.doc(token.id).set(token.toMap());
+    await _ref
+        .child(token.id)
+        .set(token.toMap())
+        .timeout(const Duration(seconds: 8));
     return token;
   }
 
   /// Used when a request is accepted: pin the request + remove from search list.
   Future<void> closeOnAcceptance(String id, String requestId) async {
-    await _col.doc(id).update({
+    await _ref.child(id).update({
       'closed': true,
       'acceptedRequestId': requestId,
-    });
+    }).timeout(const Duration(seconds: 8));
   }
 }

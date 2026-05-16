@@ -1,11 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../core/utils/id_generator.dart';
 import '../models/receiver_model.dart';
 
 class ReceiverRepository {
-  CollectionReference<Map<String, dynamic>> get _col =>
-      FirebaseFirestore.instance.collection('receivers');
+  DatabaseReference get _ref =>
+      FirebaseDatabase.instance.ref('receivers');
 
   Future<ReceiverToken> create({
     required String ownerEmail,
@@ -30,11 +30,16 @@ class ReceiverRepository {
       unitsNeeded: unitsNeeded,
       createdAt: DateTime.now(),
     );
-    await _col.doc(token.id).set(token.toMap());
+    await _ref
+        .child(token.id)
+        .set(token.toMap())
+        .timeout(const Duration(seconds: 8));
     return token;
   }
 
   Future<void> close(String id) async {
-    await _col.doc(id).update({'closed': true});
+    await _ref
+        .child(id)
+        .update({'closed': true}).timeout(const Duration(seconds: 8));
   }
 }

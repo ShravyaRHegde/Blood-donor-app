@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models/receiver_model.dart';
@@ -8,7 +8,7 @@ import '../data/repositories/receiver_repository.dart';
 
 class ReceiverProvider extends ChangeNotifier {
   final ReceiverRepository _repo = ReceiverRepository();
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<DatabaseEvent>? _sub;
 
   List<ReceiverToken> _all = const [];
   List<ReceiverToken> get all => _all;
@@ -24,15 +24,26 @@ class ReceiverProvider extends ChangeNotifier {
   }
 
   void init() {
-    _sub = FirebaseFirestore.instance
-        .collection('receivers')
-        .snapshots()
-        .listen((snap) {
-      final list =
-          snap.docs.map((d) => ReceiverToken.fromMap(d.data())).toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      _all = list;
-      notifyListeners();
+    _sub = FirebaseDatabase.instance
+        .ref('receivers')
+        .onValue
+        .listen((event) {
+      final value = event.snapshot.value;
+      if (value == null) {
+        _all = const [];
+        notifyListeners();
+        return;
+      }
+      if (value is Map) {
+        final map = Map<dynamic, dynamic>.from(value);
+        final list = map.values
+            .map((v) =>
+                ReceiverToken.fromMap(Map<String, dynamic>.from(v as Map)))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _all = list;
+        notifyListeners();
+      }
     });
     notifyListeners();
   }

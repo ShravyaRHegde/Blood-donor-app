@@ -17,8 +17,8 @@ class AuthProvider extends ChangeNotifier {
 
   /// Set once a startup probe of Firestore completes. UI uses this to show
   /// an "offline / Firestore unreachable" banner.
-  bool? _firestoreReachable;
-  bool? get firestoreReachable => _firestoreReachable;
+  bool? _databaseReachable;
+  bool? get databaseReachable => _databaseReachable;
 
   void init() {
     // Pick up a cached session synchronously so the splash decision works
@@ -42,8 +42,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _runProbe() async {
-    final ok = await _repo.probeFirestore();
-    _firestoreReachable = ok;
+    final ok = await _repo.probeDatabase();
+    _databaseReachable = ok;
+    debugPrint('AuthProvider: RTDB reachable = $ok');
     notifyListeners();
   }
 

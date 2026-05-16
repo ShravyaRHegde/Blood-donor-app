@@ -34,6 +34,8 @@ class DefaultFirebaseOptions {
     appId: '1:PROJECT_NUMBER:android:APP_HASH',
     messagingSenderId: 'PROJECT_NUMBER',
     projectId: 'your-firebase-project-id',
+    // Realtime Database URL — Firebase Console → Realtime Database → Data.
+    databaseURL: 'https://your-firebase-project-id-default-rtdb.firebaseio.com',
     storageBucket: 'your-firebase-project-id.firebasestorage.app',
   );
 }

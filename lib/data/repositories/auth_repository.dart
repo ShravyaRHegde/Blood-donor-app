@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/user_model.dart';
@@ -21,37 +21,33 @@ class AuthResult {
   const AuthResult(this.outcome, [this.user, this.message]);
 }
 
-/// AuthRepository wraps Firebase Auth + Firestore so the rest of the app
-/// keeps talking to a stable surface. Every Firestore call has an explicit
-/// timeout and a try/catch — a stalled Firestore network call must never
+/// AuthRepository wraps Firebase Auth + Realtime Database so the rest of
+/// the app keeps talking to a stable surface. Every RTDB call has an
+/// explicit timeout and a try/catch — a stalled network call must never
 /// leave the UI hanging on a spinner.
 class AuthRepository {
-  AuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
+  AuthRepository({FirebaseAuth? auth, FirebaseDatabase? db})
       : _auth = auth ?? FirebaseAuth.instance,
-        _db = firestore ?? FirebaseFirestore.instance;
+        _db = db ?? FirebaseDatabase.instance;
 
   final FirebaseAuth _auth;
-  final FirebaseFirestore _db;
+  final FirebaseDatabase _db;
 
-  // Tight enough that the user sees "something went wrong" within seconds
-  // instead of staring at an indeterminate spinner.
-  static const _fsTimeout = Duration(seconds: 8);
+  static const _ioTimeout = Duration(seconds: 8);
   static const _authTimeout = Duration(seconds: 15);
 
-  CollectionReference<Map<String, dynamic>> get _users => _db.collection('users');
+  DatabaseReference _userRef(String uid) => _db.ref('users/$uid');
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
   User? get firebaseUser => _auth.currentUser;
 
-  /// Returns null on any failure (missing doc, timeout, permission denied,
-  /// network error). Callers must tolerate null.
   Future<AppUser?> fetchProfile(String uid) async {
     try {
-      final snap = await _users.doc(uid).get().timeout(_fsTimeout);
-      final data = snap.data();
-      if (data == null) return null;
-      return AppUser.fromMap(data);
+      final snap = await _userRef(uid).get().timeout(_ioTimeout);
+      final value = snap.value;
+      if (value is! Map) return null;
+      return AppUser.fromMap(Map<String, dynamic>.from(value));
     } catch (e, st) {
       debugPrint('AuthRepository.fetchProfile($uid) failed: $e\n$st');
       return null;
@@ -79,17 +75,22 @@ class AuthRepository {
         createdAt: DateTime.now(),
       );
 
-      // Profile write is best-effort. The Firebase Auth account is created
-      // either way — if Firestore is unreachable, the user can still proceed
-      // to profile setup, which will retry the write.
-      try {
-        await _users.doc(user.uid).set(appUser.toMap()).timeout(_fsTimeout);
-        debugPrint('AuthRepository.signUp: profile doc written for ${user.uid}');
-      } catch (e, st) {
-        debugPrint(
-          'AuthRepository.signUp: profile doc write FAILED (non-fatal): $e\n$st',
-        );
-      }
+      // Profile write is fire-and-forget. Returning success unblocks the UI
+      // immediately; the auth token may take a tick to propagate to RTDB's
+      // long-lived connection (RTDB rules of the form
+      // `auth.uid == $uid` see no auth until the connection re-handshakes).
+      // The write will succeed in the background once that happens; if not,
+      // the next sign-in or profile save self-heals.
+      unawaited(
+        _userRef(user.uid).set(appUser.toMap()).then((_) {
+          debugPrint('AuthRepository.signUp: profile written for ${user.uid}');
+        }).catchError((Object e, StackTrace st) {
+          debugPrint(
+            'AuthRepository.signUp: profile write failed (will self-heal): '
+            '$e\n$st',
+          );
+        }),
+      );
 
       return AuthResult(AuthOutcome.success, appUser);
     } on TimeoutException {
@@ -97,7 +98,7 @@ class AuthRepository {
       return const AuthResult(
         AuthOutcome.networkError,
         null,
-        'Signup timed out — check your internet connection and try again.',
+        'Signup timed out — check your internet connection.',
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('AuthRepository.signUp: FirebaseAuthException ${e.code} — ${e.message}');
@@ -138,9 +139,8 @@ class AuthRepository {
           )
           .timeout(_authTimeout);
 
-      // Profile fetch is best-effort. If Firestore is unreachable, we return
-      // a stub so the user reaches the dashboard / profile-setup screen
-      // rather than getting stuck on the login button.
+      // Profile fetch is best-effort. If RTDB is unreachable, return a stub
+      // so the user reaches profile-setup instead of getting stuck.
       final profile = await fetchProfile(cred.user!.uid);
       final user = profile ??
           AppUser(
@@ -150,12 +150,10 @@ class AuthRepository {
             createdAt: DateTime.now(),
           );
 
-      // Self-heal: if the profile doc was missing (Firestore write failed at
-      // signup), try to (re)create it now.
       if (profile == null) {
         try {
-          await _users.doc(user.uid).set(user.toMap()).timeout(_fsTimeout);
-          debugPrint('AuthRepository.logIn: created missing profile doc for ${user.uid}');
+          await _userRef(user.uid).set(user.toMap()).timeout(_ioTimeout);
+          debugPrint('AuthRepository.logIn: created missing profile for ${user.uid}');
         } catch (e) {
           debugPrint('AuthRepository.logIn: profile recovery write failed: $e');
         }
@@ -167,7 +165,7 @@ class AuthRepository {
       return const AuthResult(
         AuthOutcome.networkError,
         null,
-        'Login timed out — check your internet connection and try again.',
+        'Login timed out — check your internet connection.',
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('AuthRepository.logIn: FirebaseAuthException ${e.code} — ${e.message}');
@@ -199,9 +197,6 @@ class AuthRepository {
 
   Future<void> logOut() => _auth.signOut();
 
-  /// Writes the updated profile. Returns the new AppUser on success. If the
-  /// Firestore write fails (timeout, permission denied, network), throws so
-  /// the caller can surface a UI error. Callers MUST try/catch around this.
   Future<AppUser> updateProfile({
     required String uid,
     String? name,
@@ -210,8 +205,6 @@ class AuthRepository {
     String? location,
     bool? profileComplete,
   }) async {
-    // Tolerant fetch — if the profile doesn't exist yet (recovery path),
-    // build a stub from Firebase Auth state.
     final existing = await fetchProfile(uid) ??
         AppUser(
           uid: uid,
@@ -228,24 +221,19 @@ class AuthRepository {
       profileComplete: profileComplete,
     );
 
-    await _users.doc(uid).set(updated.toMap()).timeout(_fsTimeout);
+    await _userRef(uid).set(updated.toMap()).timeout(_ioTimeout);
     debugPrint('AuthRepository.updateProfile($uid): success');
     return updated;
   }
 
-  /// Connectivity probe — reads one doc from the meta collection with a tight
-  /// timeout. Returns true if Firestore round-trips, false otherwise. Used
-  /// by the login screen banner.
-  Future<bool> probeFirestore() async {
+  /// Connectivity probe — reads one path from RTDB with a tight timeout.
+  /// Returns true if RTDB round-trips, false otherwise.
+  Future<bool> probeDatabase() async {
     try {
-      await _db
-          .collection('meta')
-          .doc('_probe')
-          .get()
-          .timeout(const Duration(seconds: 5));
+      await _db.ref('meta/_probe').get().timeout(const Duration(seconds: 5));
       return true;
     } catch (e) {
-      debugPrint('AuthRepository.probeFirestore failed: $e');
+      debugPrint('AuthRepository.probeDatabase failed: $e');
       return false;
     }
   }

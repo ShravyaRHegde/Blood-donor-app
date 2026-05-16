@@ -63,3 +63,6 @@ npm-debug.log*
 android/app/google-services.json
 lib/firebase_options.dart
 .gitignore-backup-*
+
+# Local-only runtime artefacts
+*.pid

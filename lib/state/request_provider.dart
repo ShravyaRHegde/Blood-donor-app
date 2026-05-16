@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models/request_model.dart';
@@ -8,7 +8,7 @@ import '../data/repositories/request_repository.dart';
 
 class RequestProvider extends ChangeNotifier {
   final RequestRepository _repo = RequestRepository();
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<DatabaseEvent>? _sub;
 
   List<BloodRequest> _all = const [];
   List<BloodRequest> get all => _all;
@@ -46,15 +46,21 @@ class RequestProvider extends ChangeNotifier {
   }
 
   void init() {
-    _sub = FirebaseFirestore.instance
-        .collection('requests')
-        .snapshots()
-        .listen((snap) {
-      final next = snap.docs
-          .map((d) => BloodRequest.fromMap(Map<String, dynamic>.from(d.data())))
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      _all = next;
+    _sub = FirebaseDatabase.instance.ref('requests').onValue.listen((event) {
+      final value = event.snapshot.value;
+      if (value == null) {
+        _all = const [];
+      } else if (value is Map) {
+        final map = Map<dynamic, dynamic>.from(value);
+        final next = map.values
+            .map((v) =>
+                BloodRequest.fromMap(Map<String, dynamic>.from(v as Map)))
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        _all = next;
+      } else {
+        _all = const [];
+      }
       notifyListeners();
     });
     notifyListeners();

@@ -1,36 +1,40 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../core/utils/id_generator.dart';
 import '../models/donor_model.dart';
 
 /// Pre-loads six seed donor tokens across blood groups and cities so the
-/// "Find Donor" screen is populated for any user. Seeding is gated by a
-/// meta doc so multiple clients booting the app can't double-insert.
-class FirestoreSeed {
-  FirestoreSeed._();
+/// "Find Donor" screen is populated for any user. Gated by a meta node
+/// claimed inside an RTDB transaction so multiple clients booting the app
+/// can't double-insert.
+class RtdbSeed {
+  RtdbSeed._();
 
-  static const _seedDocId = 'seed_v1';
+  static const _seedKey = 'seed_v1';
   static const _seedOwnerEmail = 'seed@community.local';
 
-  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static FirebaseDatabase get _db => FirebaseDatabase.instance;
 
   static Future<void> ensureSeeded() async {
-    final metaRef = _db.collection('meta').doc(_seedDocId);
-    final already = await metaRef.get();
-    if (already.exists && already.data()?['done'] == true) return;
+    final metaRef = _db.ref('meta/$_seedKey');
 
-    // Race guard: claim the seed slot inside a transaction so two clients
-    // booting simultaneously don't both run the loop.
-    final shouldRun = await _db.runTransaction<bool>((tx) async {
-      final snap = await tx.get(metaRef);
-      if (snap.exists && snap.data()?['done'] == true) return false;
-      tx.set(metaRef, {
+    final existing =
+        await metaRef.get().timeout(const Duration(seconds: 6));
+    if (existing.value is Map) {
+      final m = Map<String, dynamic>.from(existing.value as Map);
+      if (m['done'] == true) return;
+    }
+
+    final claim = await metaRef.runTransaction((Object? current) {
+      if (current is Map && current['done'] == true) {
+        return Transaction.abort();
+      }
+      return Transaction.success(<String, Object?>{
         'done': false,
-        'startedAt': FieldValue.serverTimestamp(),
+        'startedAt': ServerValue.timestamp,
       });
-      return true;
     });
-    if (!shouldRun) return;
+    if (!claim.committed) return;
 
     final now = DateTime.now();
     final seeds = <_Seed>[
@@ -42,6 +46,7 @@ class FirestoreSeed {
       _Seed('Arjun Reddy', 'B-', 'Pune, Maharashtra', '9876543206', '2025-12-12'),
     ];
 
+    final donorsRoot = _db.ref('donors');
     for (var i = 0; i < seeds.length; i++) {
       final s = seeds[i];
       final id = await IdGenerator.donor();
@@ -55,12 +60,12 @@ class FirestoreSeed {
         lastDonationDate: s.lastDonation,
         createdAt: now.subtract(Duration(hours: i * 6)),
       );
-      await _db.collection('donors').doc(token.id).set(token.toMap());
+      await donorsRoot.child(id).set(token.toMap());
     }
 
-    await metaRef.set({
+    await metaRef.set(<String, Object?>{
       'done': true,
-      'completedAt': FieldValue.serverTimestamp(),
+      'completedAt': ServerValue.timestamp,
       'count': seeds.length,
     });
   }

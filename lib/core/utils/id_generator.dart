@@ -1,13 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 
 /// Mints readable tokens like DNR-20260420-001 / RCV-... / REQ-...
 ///
-/// Sequence counters live in a `counters/{prefix_YYYYMMDD}` doc in Firestore.
-/// Each mint runs as a Firestore transaction so two concurrent callers — even
-/// on different devices — can never read-then-write the same counter and
-/// produce duplicate IDs. Firestore's optimistic concurrency retries one of
-/// the racers until the read snapshot is fresh.
+/// Sequence counters live at `counters/{prefix_YYYYMMDD}` in Realtime
+/// Database. Each mint runs as an RTDB transaction so two concurrent
+/// callers — even on different devices — can't read-then-write the same
+/// counter and produce duplicate IDs. RTDB's optimistic concurrency
+/// retries one of the racers automatically.
 class IdGenerator {
   IdGenerator._();
 
@@ -15,7 +15,7 @@ class IdGenerator {
   static const _prefixReceiver = 'RCV';
   static const _prefixRequest = 'REQ';
 
-  static FirebaseFirestore get _db => FirebaseFirestore.instance;
+  static FirebaseDatabase get _db => FirebaseDatabase.instance;
 
   static Future<String> donor() => _mint(_prefixDonor);
   static Future<String> receiver() => _mint(_prefixReceiver);
@@ -23,14 +23,22 @@ class IdGenerator {
 
   static Future<String> _mint(String prefix) async {
     final today = DateFormat('yyyyMMdd').format(DateTime.now());
-    final ref = _db.collection('counters').doc('${prefix}_$today');
-    final next = await _db.runTransaction<int>((tx) async {
-      final snap = await tx.get(ref);
-      final current = (snap.data()?['value'] as int?) ?? 0;
-      final n = current + 1;
-      tx.set(ref, {'value': n, 'updatedAt': FieldValue.serverTimestamp()});
-      return n;
+    final ref = _db.ref('counters/${prefix}_$today');
+
+    final result = await ref.runTransaction((Object? current) {
+      final n = _coerceInt(current) + 1;
+      return Transaction.success(n);
     });
-    return '$prefix-$today-${next.toString().padLeft(3, '0')}';
+
+    final n = _coerceInt(result.snapshot.value);
+    return '$prefix-$today-${n.toString().padLeft(3, '0')}';
+  }
+
+  static int _coerceInt(Object? v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
   }
 }

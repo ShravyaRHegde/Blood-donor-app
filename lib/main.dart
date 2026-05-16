@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
-import 'data/remote/firestore_seed.dart';
+import 'data/remote/rtdb_seed.dart';
 import 'firebase_options.dart';
 import 'state/auth_provider.dart';
 import 'state/donor_provider.dart';
@@ -21,21 +22,24 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Firebase init must succeed before any provider touches Firestore/Auth.
-  // If config is wrong, fail loudly in logcat instead of black-screen-hang.
+  // The Android google-services Gradle plugin auto-initializes a "[DEFAULT]"
+  // Firebase app from google-services.json before this Dart code runs. If we
+  // ever try to initializeApp() again with the same name, it throws
+  // [core/duplicate-app]. So only init if no app exists yet.
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).timeout(const Duration(seconds: 10));
-    debugPrint('Firebase init OK — project=${Firebase.app().options.projectId}');
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 10));
+    }
+    debugPrint('Firebase init OK — project=${Firebase.app().options.projectId} '
+        'db=${Firebase.app().options.databaseURL}');
   } catch (e, st) {
     debugPrint('Firebase init FAILED: $e\n$st');
-    // Continue to runApp anyway so the user sees a non-black screen
-    // explaining the failure rather than a black void.
   }
 
-  // Seeding is fire-and-forget. If Firestore is unreachable, rules deny, or
-  // the project isn't fully configured, the boot path must NOT block — the
+  // Seeding is fire-and-forget. If RTDB is unreachable, rules deny, or the
+  // project isn't fully configured, the boot path must NOT block — the
   // login screen has to render so the user can sign in / debug.
   unawaited(_seedInBackground());
 
@@ -54,15 +58,15 @@ Future<void> main() async {
 
 Future<void> _seedInBackground() async {
   try {
-    await FirestoreSeed.ensureSeeded().timeout(const Duration(seconds: 20));
-    debugPrint('Firestore seed: complete');
+    await RtdbSeed.ensureSeeded().timeout(const Duration(seconds: 20));
+    debugPrint('RTDB seed: complete');
   } on TimeoutException {
     debugPrint(
-      'Firestore seed TIMED OUT — likely Firestore is not enabled, rules '
-      'deny unauthenticated writes, or the device is offline. App will boot '
+      'RTDB seed TIMED OUT — likely Realtime Database is not enabled in the '
+      'project, rules deny the write, or the device is offline. App boots '
       'with no seed donors; signup will still work once writes are allowed.',
     );
   } catch (e, st) {
-    debugPrint('Firestore seed FAILED (non-fatal): $e\n$st');
+    debugPrint('RTDB seed FAILED (non-fatal): $e\n$st');
   }
 }

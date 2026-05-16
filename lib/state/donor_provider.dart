@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models/donor_model.dart';
@@ -8,7 +8,7 @@ import '../data/repositories/donor_repository.dart';
 
 class DonorProvider extends ChangeNotifier {
   final DonorRepository _repo = DonorRepository();
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  StreamSubscription<DatabaseEvent>? _sub;
 
   List<DonorToken> _all = const [];
   List<DonorToken> get all => _all;
@@ -26,15 +26,18 @@ class DonorProvider extends ChangeNotifier {
   }
 
   void init() {
-    _sub = FirebaseFirestore.instance
-        .collection('donors')
-        .snapshots()
-        .listen((snap) {
-      final next = snap.docs
-          .map((d) => DonorToken.fromMap(d.data()))
-          .toList();
-      next.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      _all = next;
+    _sub = FirebaseDatabase.instance.ref('donors').onValue.listen((event) {
+      final value = event.snapshot.value;
+      if (value == null) {
+        _all = const [];
+      } else if (value is Map) {
+        final map = Map<dynamic, dynamic>.from(value);
+        final next = map.values
+            .map((v) => DonorToken.fromMap(Map<String, dynamic>.from(v as Map)))
+            .toList();
+        next.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _all = next;
+      }
       notifyListeners();
     });
     notifyListeners();
