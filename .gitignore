@@ -56,3 +56,10 @@ npm-debug.log*
 *.apk
 *.aab
 *.apk.sha1
+
+# Firebase configuration — generated per-developer / per-project.
+# `flutterfire configure` regenerates both. See firebase_options.example.dart
+# for the expected structure.
+android/app/google-services.json
+lib/firebase_options.dart
+.gitignore-backup-*
