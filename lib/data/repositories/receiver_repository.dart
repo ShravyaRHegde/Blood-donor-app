@@ -1,25 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/utils/id_generator.dart';
-import '../local/hive_boxes.dart';
 import '../models/receiver_model.dart';
 
 class ReceiverRepository {
-  List<ReceiverToken> all() {
-    final box = HiveBoxes.receiversBox();
-    final out = box.values
-        .map((v) => ReceiverToken.fromMap(Map<String, dynamic>.from(v as Map)))
-        .toList();
-    out.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return out;
-  }
-
-  List<ReceiverToken> byOwner(String email) =>
-      all().where((r) => r.ownerEmail == email.toLowerCase()).toList();
-
-  ReceiverToken? byId(String id) {
-    final v = HiveBoxes.receiversBox().get(id);
-    if (v == null) return null;
-    return ReceiverToken.fromMap(Map<String, dynamic>.from(v as Map));
-  }
+  CollectionReference<Map<String, dynamic>> get _col =>
+      FirebaseFirestore.instance.collection('receivers');
 
   Future<ReceiverToken> create({
     required String ownerEmail,
@@ -44,13 +30,11 @@ class ReceiverRepository {
       unitsNeeded: unitsNeeded,
       createdAt: DateTime.now(),
     );
-    await HiveBoxes.receiversBox().put(token.id, token.toMap());
+    await _col.doc(token.id).set(token.toMap());
     return token;
   }
 
   Future<void> close(String id) async {
-    final existing = byId(id);
-    if (existing == null) return;
-    await HiveBoxes.receiversBox().put(id, existing.copyWith(closed: true).toMap());
+    await _col.doc(id).update({'closed': true});
   }
 }

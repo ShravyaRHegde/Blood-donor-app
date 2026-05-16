@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/models/user_model.dart';
@@ -5,6 +8,7 @@ import '../data/repositories/auth_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repo = AuthRepository();
+  StreamSubscription<User?>? _authSub;
 
   AppUser? _current;
   AppUser? get current => _current;
@@ -12,15 +16,46 @@ class AuthProvider extends ChangeNotifier {
   bool get needsProfileSetup => _current != null && !_current!.profileComplete;
 
   void init() {
-    try {
-      _current = _repo.currentUser();
-    } catch (_) {
-      // Corrupt or schema-drifted session — clear it so the app boots to login
-      // instead of crashing on a malformed cached user.
-      _repo.logOut();
-      _current = null;
+    // Pick up a cached session synchronously so the splash decision works
+    // even if the Firestore profile fetch is mid-flight.
+    final fbUser = _repo.firebaseUser;
+    if (fbUser != null) {
+      _current = AppUser(
+        uid: fbUser.uid,
+        email: fbUser.email ?? '',
+        name: '',
+        createdAt: DateTime.now(),
+      );
+      _hydrateProfile(fbUser.uid);
     }
+    _authSub = _repo.authStateChanges().listen(_onAuthChange);
     notifyListeners();
+  }
+
+  Future<void> _onAuthChange(User? user) async {
+    if (user == null) {
+      _current = null;
+      notifyListeners();
+      return;
+    }
+    // Same uid as the cached stub — just hydrate.
+    if (_current?.uid == user.uid && _current?.profileComplete == true) {
+      return;
+    }
+    await _hydrateProfile(user.uid);
+  }
+
+  Future<void> _hydrateProfile(String uid) async {
+    try {
+      final profile = await _repo.fetchProfile(uid);
+      if (profile != null) {
+        _current = profile;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Don't blow the boot path on a transient fetch failure — the listener
+      // will retry on the next auth-state event.
+    }
   }
 
   Future<AuthResult> signUp({
@@ -60,9 +95,10 @@ class AuthProvider extends ChangeNotifier {
     required String dob,
     required String location,
   }) async {
-    if (_current == null) return;
+    final u = _current;
+    if (u == null) return;
     final updated = await _repo.updateProfile(
-      email: _current!.email,
+      uid: u.uid,
       name: name,
       phone: phone,
       dob: dob,
@@ -79,9 +115,10 @@ class AuthProvider extends ChangeNotifier {
     String? dob,
     String? location,
   }) async {
-    if (_current == null) return;
+    final u = _current;
+    if (u == null) return;
     final updated = await _repo.updateProfile(
-      email: _current!.email,
+      uid: u.uid,
       name: name,
       phone: phone,
       dob: dob,
@@ -89,5 +126,11 @@ class AuthProvider extends ChangeNotifier {
     );
     _current = updated;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
   }
 }

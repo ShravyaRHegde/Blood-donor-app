@@ -9,10 +9,9 @@ void main() {
   group('AppUser', () {
     test('toMap -> fromMap round-trip preserves all fields', () {
       final u = AppUser(
+        uid: 'firebase-uid-123',
         email: 'a@b.com',
         name: 'Anita',
-        passwordHash: 'hash',
-        passwordSalt: 'salt',
         phone: '9876543210',
         dob: '1990-01-01',
         location: 'Bengaluru, Karnataka',
@@ -20,10 +19,9 @@ void main() {
         profileComplete: true,
       );
       final again = AppUser.fromMap(u.toMap());
+      expect(again.uid, u.uid);
       expect(again.email, u.email);
       expect(again.name, u.name);
-      expect(again.passwordHash, u.passwordHash);
-      expect(again.passwordSalt, u.passwordSalt);
       expect(again.phone, u.phone);
       expect(again.dob, u.dob);
       expect(again.location, u.location);
@@ -33,17 +31,16 @@ void main() {
 
     test('copyWith updates only provided fields', () {
       final u = AppUser(
+        uid: 'firebase-uid-123',
         email: 'a@b.com',
         name: 'Anita',
-        passwordHash: 'h',
-        passwordSalt: 's',
         createdAt: DateTime.utc(2026, 1, 1),
       );
       final v = u.copyWith(name: 'Anita K', profileComplete: true);
       expect(v.name, 'Anita K');
       expect(v.profileComplete, isTrue);
       expect(v.email, u.email);
-      expect(v.passwordHash, u.passwordHash);
+      expect(v.uid, u.uid);
     });
   });
 

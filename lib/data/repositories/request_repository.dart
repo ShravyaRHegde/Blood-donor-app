@@ -1,54 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/utils/id_generator.dart';
-import '../local/hive_boxes.dart';
 import '../models/request_model.dart';
-import 'donor_repository.dart';
 
 class RequestRepository {
-  final DonorRepository _donorRepo;
-  RequestRepository(this._donorRepo);
+  RequestRepository();
 
-  List<BloodRequest> all() {
-    final box = HiveBoxes.requestsBox();
-    final out = box.values
-        .map((v) => BloodRequest.fromMap(Map<String, dynamic>.from(v as Map)))
-        .toList();
-    out.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return out;
-  }
-
-  BloodRequest? byId(String id) {
-    final v = HiveBoxes.requestsBox().get(id);
-    if (v == null) return null;
-    return BloodRequest.fromMap(Map<String, dynamic>.from(v as Map));
-  }
-
-  /// Requests sent by the given user (as a receiver).
-  List<BloodRequest> bySender(String email) =>
-      all().where((r) => r.senderEmail == email.toLowerCase()).toList();
-
-  /// Requests received by the given user (as a donor).
-  List<BloodRequest> byRecipient(String email) =>
-      all().where((r) => r.recipientEmail == email.toLowerCase()).toList();
-
-  /// Requests attached to a specific donor token.
-  List<BloodRequest> forDonorToken(String donorTokenId) =>
-      all().where((r) => r.donorTokenId == donorTokenId).toList();
-
-  /// Existing active (non-terminal) request between this receiver token
-  /// and this donor token, if any.
-  BloodRequest? activeBetween({
-    required String donorTokenId,
-    required String receiverTokenId,
-  }) {
-    for (final r in all()) {
-      if (r.donorTokenId == donorTokenId &&
-          r.receiverTokenId == receiverTokenId &&
-          r.status.isActive) {
-        return r;
-      }
-    }
-    return null;
-  }
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<BloodRequest> create({
     required String donorTokenId,
@@ -67,28 +25,40 @@ class RequestRepository {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await HiveBoxes.requestsBox().put(req.id, req.toMap());
+    await _db.collection('requests').doc(req.id).set(req.toMap());
     return req;
   }
 
-  Future<BloodRequest> updateStatus(String id, RequestStatus status) async {
-    final existing = byId(id);
-    if (existing == null) throw StateError('Request not found: $id');
+  /// Atomically advances a request's status. On [RequestStatus.accepted],
+  /// the associated donor token is closed in the same transaction, so the
+  /// request and donor either both update or neither does.
+  Future<BloodRequest> updateStatus(String id, RequestStatus status) {
+    return _db.runTransaction<BloodRequest>((tx) async {
+      final reqRef = _db.collection('requests').doc(id);
+      final reqSnap = await tx.get(reqRef);
+      if (!reqSnap.exists) {
+        throw StateError('Request not found: $id');
+      }
+      final existing = BloodRequest.fromMap(
+        Map<String, dynamic>.from(reqSnap.data()!),
+      );
 
-    // Acceptance closes the donor token so it drops off the search list.
-    // Close the donor first: if the request write then fails, the worst case
-    // is a closed token with no accepted request (recoverable); the inverse
-    // (accepted request + open donor in search list) is harder to repair.
-    if (status == RequestStatus.accepted) {
-      await _donorRepo.closeOnAcceptance(existing.donorTokenId, existing.id);
-    }
+      if (status == RequestStatus.accepted) {
+        final donorRef = _db.collection('donors').doc(existing.donorTokenId);
+        final donorSnap = await tx.get(donorRef);
+        if (!donorSnap.exists) {
+          throw StateError('Donor token not found: ${existing.donorTokenId}');
+        }
+        tx.update(donorRef, {
+          'closed': true,
+          'acceptedRequestId': existing.id,
+        });
+      }
 
-    final updated = existing.copyWith(status: status, updatedAt: DateTime.now());
-    await HiveBoxes.requestsBox().put(id, updated.toMap());
-    return updated;
-  }
-
-  Future<void> delete(String id) async {
-    await HiveBoxes.requestsBox().delete(id);
+      final updated =
+          existing.copyWith(status: status, updatedAt: DateTime.now());
+      tx.set(reqRef, updated.toMap());
+      return updated;
+    });
   }
 }

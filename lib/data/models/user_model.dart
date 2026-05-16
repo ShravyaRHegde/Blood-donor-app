@@ -1,8 +1,9 @@
+/// Domain user. Identity comes from Firebase Auth (uid).
+/// Profile fields live in Firestore at users/{uid}.
 class AppUser {
+  final String uid;
   final String email;
   final String name;
-  final String passwordHash;
-  final String passwordSalt;
   final String phone;
   final String dob;
   final String location;
@@ -10,10 +11,9 @@ class AppUser {
   final bool profileComplete;
 
   const AppUser({
+    required this.uid,
     required this.email,
     required this.name,
-    required this.passwordHash,
-    required this.passwordSalt,
     this.phone = '',
     this.dob = '',
     this.location = '',
@@ -29,10 +29,9 @@ class AppUser {
     bool? profileComplete,
   }) =>
       AppUser(
+        uid: uid,
         email: email,
         name: name ?? this.name,
-        passwordHash: passwordHash,
-        passwordSalt: passwordSalt,
         phone: phone ?? this.phone,
         dob: dob ?? this.dob,
         location: location ?? this.location,
@@ -41,10 +40,9 @@ class AppUser {
       );
 
   Map<String, dynamic> toMap() => {
+        'uid': uid,
         'email': email,
         'name': name,
-        'passwordHash': passwordHash,
-        'passwordSalt': passwordSalt,
         'phone': phone,
         'dob': dob,
         'location': location,
@@ -53,10 +51,9 @@ class AppUser {
       };
 
   static AppUser fromMap(Map<String, dynamic> m) => AppUser(
+        uid: m['uid'] as String,
         email: m['email'] as String,
-        name: m['name'] as String,
-        passwordHash: m['passwordHash'] as String,
-        passwordSalt: m['passwordSalt'] as String,
+        name: (m['name'] ?? '') as String,
         phone: (m['phone'] ?? '') as String,
         dob: (m['dob'] ?? '') as String,
         location: (m['location'] ?? '') as String,

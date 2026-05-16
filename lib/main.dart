@@ -1,11 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
-import 'data/local/hive_boxes.dart';
-import 'data/local/seed_data.dart';
+import 'data/remote/firestore_seed.dart';
+import 'firebase_options.dart';
 import 'state/auth_provider.dart';
 import 'state/donor_provider.dart';
 import 'state/receiver_provider.dart';
@@ -19,9 +19,13 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  await Hive.initFlutter();
-  await HiveBoxes.openAll();
-  await SeedData.ensureSeeded();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Push the seed donor catalog into Firestore exactly once across all clients.
+  // Guarded by a meta doc so the second device to boot doesn't duplicate.
+  await FirestoreSeed.ensureSeeded();
 
   runApp(
     MultiProvider(

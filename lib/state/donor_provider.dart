@@ -1,15 +1,14 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 
-import '../data/local/hive_boxes.dart';
 import '../data/models/donor_model.dart';
 import '../data/repositories/donor_repository.dart';
 
 class DonorProvider extends ChangeNotifier {
   final DonorRepository _repo = DonorRepository();
-  StreamSubscription<BoxEvent>? _sub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
 
   List<DonorToken> _all = const [];
   List<DonorToken> get all => _all;
@@ -27,9 +26,15 @@ class DonorProvider extends ChangeNotifier {
   }
 
   void init() {
-    _all = _repo.all();
-    _sub = HiveBoxes.donorsBox().watch().listen((_) {
-      _all = _repo.all();
+    _sub = FirebaseFirestore.instance
+        .collection('donors')
+        .snapshots()
+        .listen((snap) {
+      final next = snap.docs
+          .map((d) => DonorToken.fromMap(d.data()))
+          .toList();
+      next.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _all = next;
       notifyListeners();
     });
     notifyListeners();

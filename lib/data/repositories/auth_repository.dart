@@ -1,5 +1,6 @@
-import '../../core/utils/password_hash.dart';
-import '../local/hive_boxes.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/user_model.dart';
 
 enum AuthOutcome { success, emailTaken, invalidCredentials, unknownEmail }
@@ -10,14 +11,31 @@ class AuthResult {
   const AuthResult(this.outcome, [this.user]);
 }
 
+/// AuthRepository wraps Firebase Auth + Firestore so the rest of the app
+/// keeps talking to a stable surface (signUp / logIn / logOut / updateProfile).
+/// Identity comes from Firebase Auth; the editable profile fields live in
+/// the `users/{uid}` Firestore doc.
 class AuthRepository {
-  static const _sessionKey = 'currentUserEmail';
+  AuthRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
+      : _auth = auth ?? FirebaseAuth.instance,
+        _db = firestore ?? FirebaseFirestore.instance;
 
-  AppUser? findByEmail(String email) {
-    final box = HiveBoxes.usersBox();
-    final v = box.get(email.toLowerCase());
-    if (v == null) return null;
-    return AppUser.fromMap(Map<String, dynamic>.from(v as Map));
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _db;
+
+  CollectionReference<Map<String, dynamic>> get _users => _db.collection('users');
+
+  /// Streams the auth-state user-record pair. Providers listen to this to
+  /// rebuild whenever the user signs in or out.
+  Stream<User?> authStateChanges() => _auth.authStateChanges();
+
+  User? get firebaseUser => _auth.currentUser;
+
+  Future<AppUser?> fetchProfile(String uid) async {
+    final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    if (data == null) return null;
+    return AppUser.fromMap(data);
   }
 
   Future<AuthResult> signUp({
@@ -25,62 +43,84 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final key = email.toLowerCase();
-    final box = HiveBoxes.usersBox();
-    if (box.containsKey(key)) {
-      return const AuthResult(AuthOutcome.emailTaken);
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      final user = cred.user!;
+      final appUser = AppUser(
+        uid: user.uid,
+        email: user.email ?? email.toLowerCase(),
+        name: name.trim(),
+        createdAt: DateTime.now(),
+      );
+      await _users.doc(user.uid).set(appUser.toMap());
+      return AuthResult(AuthOutcome.success, appUser);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'email-already-in-use':
+          return const AuthResult(AuthOutcome.emailTaken);
+        case 'weak-password':
+        case 'invalid-email':
+          return const AuthResult(AuthOutcome.invalidCredentials);
+        default:
+          return const AuthResult(AuthOutcome.invalidCredentials);
+      }
     }
-    final salt = PasswordHash.newSalt();
-    final user = AppUser(
-      email: key,
-      name: name.trim(),
-      passwordHash: PasswordHash.hash(password, salt),
-      passwordSalt: salt,
-      createdAt: DateTime.now(),
-    );
-    await box.put(key, user.toMap());
-    await _setSession(key);
-    return AuthResult(AuthOutcome.success, user);
   }
 
   Future<AuthResult> logIn({
     required String email,
     required String password,
   }) async {
-    final user = findByEmail(email);
-    if (user == null) return const AuthResult(AuthOutcome.unknownEmail);
-    final ok = PasswordHash.verify(
-      password: password,
-      salt: user.passwordSalt,
-      expectedHash: user.passwordHash,
-    );
-    if (!ok) return const AuthResult(AuthOutcome.invalidCredentials);
-    await _setSession(user.email);
-    return AuthResult(AuthOutcome.success, user);
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      final profile = await fetchProfile(cred.user!.uid);
+      // Profile doc missing — should be unreachable after signUp wrote it,
+      // but we recover by creating a minimal record so the user can finish
+      // profile setup rather than getting stuck.
+      final user = profile ??
+          AppUser(
+            uid: cred.user!.uid,
+            email: cred.user!.email ?? email.toLowerCase(),
+            name: '',
+            createdAt: DateTime.now(),
+          );
+      if (profile == null) {
+        await _users.doc(user.uid).set(user.toMap());
+      }
+      return AuthResult(AuthOutcome.success, user);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+          return const AuthResult(AuthOutcome.unknownEmail);
+        case 'wrong-password':
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          return const AuthResult(AuthOutcome.invalidCredentials);
+        default:
+          return const AuthResult(AuthOutcome.invalidCredentials);
+      }
+    }
   }
 
-  Future<void> logOut() async {
-    await HiveBoxes.sessionBox().delete(_sessionKey);
-  }
-
-  AppUser? currentUser() {
-    final email = HiveBoxes.sessionBox().get(_sessionKey) as String?;
-    if (email == null) return null;
-    return findByEmail(email);
-  }
+  Future<void> logOut() => _auth.signOut();
 
   Future<AppUser> updateProfile({
-    required String email,
+    required String uid,
     String? name,
     String? phone,
     String? dob,
     String? location,
     bool? profileComplete,
   }) async {
-    final box = HiveBoxes.usersBox();
-    final existing = findByEmail(email);
+    final existing = await fetchProfile(uid);
     if (existing == null) {
-      throw StateError('User not found: $email');
+      throw StateError('Profile not found for uid $uid');
     }
     final updated = existing.copyWith(
       name: name,
@@ -89,11 +129,7 @@ class AuthRepository {
       location: location,
       profileComplete: profileComplete,
     );
-    await box.put(email.toLowerCase(), updated.toMap());
+    await _users.doc(uid).set(updated.toMap());
     return updated;
-  }
-
-  Future<void> _setSession(String email) async {
-    await HiveBoxes.sessionBox().put(_sessionKey, email);
   }
 }

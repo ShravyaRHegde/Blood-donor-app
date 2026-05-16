@@ -1,16 +1,14 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 
-import '../data/local/hive_boxes.dart';
 import '../data/models/request_model.dart';
-import '../data/repositories/donor_repository.dart';
 import '../data/repositories/request_repository.dart';
 
 class RequestProvider extends ChangeNotifier {
-  final RequestRepository _repo = RequestRepository(DonorRepository());
-  StreamSubscription<BoxEvent>? _sub;
+  final RequestRepository _repo = RequestRepository();
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
 
   List<BloodRequest> _all = const [];
   List<BloodRequest> get all => _all;
@@ -31,19 +29,32 @@ class RequestProvider extends ChangeNotifier {
     return null;
   }
 
+  /// Existing active (non-terminal) request between this receiver token
+  /// and this donor token, if any.
   BloodRequest? activeBetween({
     required String donorTokenId,
     required String receiverTokenId,
-  }) =>
-      _repo.activeBetween(
-        donorTokenId: donorTokenId,
-        receiverTokenId: receiverTokenId,
-      );
+  }) {
+    for (final r in _all) {
+      if (r.donorTokenId == donorTokenId &&
+          r.receiverTokenId == receiverTokenId &&
+          r.status.isActive) {
+        return r;
+      }
+    }
+    return null;
+  }
 
   void init() {
-    _all = _repo.all();
-    _sub = HiveBoxes.requestsBox().watch().listen((_) {
-      _all = _repo.all();
+    _sub = FirebaseFirestore.instance
+        .collection('requests')
+        .snapshots()
+        .listen((snap) {
+      final next = snap.docs
+          .map((d) => BloodRequest.fromMap(Map<String, dynamic>.from(d.data())))
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      _all = next;
       notifyListeners();
     });
     notifyListeners();
@@ -65,9 +76,11 @@ class RequestProvider extends ChangeNotifier {
   Future<BloodRequest> advance(String id, RequestStatus next) =>
       _repo.updateStatus(id, next);
 
-  Future<void> withdraw(String id) => _repo.updateStatus(id, RequestStatus.withdrawn);
+  Future<void> withdraw(String id) =>
+      _repo.updateStatus(id, RequestStatus.withdrawn);
 
-  Future<void> decline(String id) => _repo.updateStatus(id, RequestStatus.declined);
+  Future<void> decline(String id) =>
+      _repo.updateStatus(id, RequestStatus.declined);
 
   @override
   void dispose() {
