@@ -95,13 +95,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    await context.read<AuthProvider>().completeProfile(
+    final ok = await context.read<AuthProvider>().completeProfile(
           name: _name.text.trim(),
           phone: _phone.text.trim(),
           dob: _dob.text.trim(),
           location: _location.text.trim(),
         );
     if (!mounted) return;
+    if (!ok) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't save profile — Firestore is unreachable. "
+            'Check your connection and try again.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const DashboardScreen()),
       (_) => false,

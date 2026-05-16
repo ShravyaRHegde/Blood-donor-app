@@ -15,6 +15,11 @@ class AuthProvider extends ChangeNotifier {
   bool get isSignedIn => _current != null;
   bool get needsProfileSetup => _current != null && !_current!.profileComplete;
 
+  /// Set once a startup probe of Firestore completes. UI uses this to show
+  /// an "offline / Firestore unreachable" banner.
+  bool? _firestoreReachable;
+  bool? get firestoreReachable => _firestoreReachable;
+
   void init() {
     // Pick up a cached session synchronously so the splash decision works
     // even if the Firestore profile fetch is mid-flight.
@@ -29,6 +34,16 @@ class AuthProvider extends ChangeNotifier {
       _hydrateProfile(fbUser.uid);
     }
     _authSub = _repo.authStateChanges().listen(_onAuthChange);
+
+    // Fire-and-forget Firestore probe.
+    _runProbe();
+
+    notifyListeners();
+  }
+
+  Future<void> _runProbe() async {
+    final ok = await _repo.probeFirestore();
+    _firestoreReachable = ok;
     notifyListeners();
   }
 
@@ -38,7 +53,6 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    // Same uid as the cached stub — just hydrate.
     if (_current?.uid == user.uid && _current?.profileComplete == true) {
       return;
     }
@@ -46,15 +60,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _hydrateProfile(String uid) async {
-    try {
-      final profile = await _repo.fetchProfile(uid);
-      if (profile != null) {
-        _current = profile;
-        notifyListeners();
-      }
-    } catch (_) {
-      // Don't blow the boot path on a transient fetch failure — the listener
-      // will retry on the next auth-state event.
+    final profile = await _repo.fetchProfile(uid);
+    if (profile != null) {
+      _current = profile;
+      notifyListeners();
     }
   }
 
@@ -89,43 +98,58 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> completeProfile({
+  /// Returns true on success, false on failure. Caller should show an error
+  /// snackbar on false.
+  Future<bool> completeProfile({
     required String name,
     required String phone,
     required String dob,
     required String location,
   }) async {
     final u = _current;
-    if (u == null) return;
-    final updated = await _repo.updateProfile(
-      uid: u.uid,
-      name: name,
-      phone: phone,
-      dob: dob,
-      location: location,
-      profileComplete: true,
-    );
-    _current = updated;
-    notifyListeners();
+    if (u == null) return false;
+    try {
+      final updated = await _repo.updateProfile(
+        uid: u.uid,
+        name: name,
+        phone: phone,
+        dob: dob,
+        location: location,
+        profileComplete: true,
+      );
+      _current = updated;
+      notifyListeners();
+      return true;
+    } catch (e, st) {
+      debugPrint('AuthProvider.completeProfile failed: $e\n$st');
+      return false;
+    }
   }
 
-  Future<void> editProfile({
+  /// Returns true on success, false on failure.
+  Future<bool> editProfile({
     String? name,
     String? phone,
     String? dob,
     String? location,
   }) async {
     final u = _current;
-    if (u == null) return;
-    final updated = await _repo.updateProfile(
-      uid: u.uid,
-      name: name,
-      phone: phone,
-      dob: dob,
-      location: location,
-    );
-    _current = updated;
-    notifyListeners();
+    if (u == null) return false;
+    try {
+      final updated = await _repo.updateProfile(
+        uid: u.uid,
+        name: name,
+        phone: phone,
+        dob: dob,
+        location: location,
+      );
+      _current = updated;
+      notifyListeners();
+      return true;
+    } catch (e, st) {
+      debugPrint('AuthProvider.editProfile failed: $e\n$st');
+      return false;
+    }
   }
 
   @override

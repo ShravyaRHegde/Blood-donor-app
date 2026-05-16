@@ -83,13 +83,20 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    await context.read<AuthProvider>().editProfile(
+    final ok = await context.read<AuthProvider>().editProfile(
           name: _name.text.trim(),
           phone: _phone.text.trim(),
           dob: _dob.text.trim(),
           location: _location.text.trim(),
         );
     if (!mounted) return;
+    if (!ok) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save — Firestore unreachable.")),
+      );
+      return;
+    }
     Navigator.of(context).pop();
   }
 

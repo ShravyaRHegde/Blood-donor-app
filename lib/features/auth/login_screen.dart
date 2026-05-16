@@ -55,10 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
         _snack('No account found for that email');
         break;
       case AuthOutcome.invalidCredentials:
-        _snack('Incorrect password');
+        _snack(res.message ?? 'Incorrect email or password');
+        break;
+      case AuthOutcome.networkError:
+        _snack(res.message ?? 'Network error — check your connection');
         break;
       default:
-        _snack('Something went wrong');
+        _snack(res.message ?? 'Something went wrong');
     }
   }
 

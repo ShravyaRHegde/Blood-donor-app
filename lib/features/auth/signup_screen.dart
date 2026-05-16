@@ -63,8 +63,14 @@ class _SignupScreenState extends State<SignupScreen> {
       case AuthOutcome.emailTaken:
         _snack('An account already exists for that email');
         break;
+      case AuthOutcome.networkError:
+        _snack(res.message ?? 'Network error — check your connection');
+        break;
+      case AuthOutcome.invalidCredentials:
+        _snack(res.message ?? 'Invalid email or password');
+        break;
       default:
-        _snack('Could not create account');
+        _snack(res.message ?? 'Could not create account');
     }
   }
 
