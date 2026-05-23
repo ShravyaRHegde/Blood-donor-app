@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -9,20 +10,18 @@ import '../data/repositories/auth_repository.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repo = AuthRepository();
   StreamSubscription<User?>? _authSub;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   AppUser? _current;
   AppUser? get current => _current;
   bool get isSignedIn => _current != null;
   bool get needsProfileSetup => _current != null && !_current!.profileComplete;
 
-  /// Set once a startup probe of Firestore completes. UI uses this to show
-  /// an "offline / Firestore unreachable" banner.
   bool? _databaseReachable;
   bool? get databaseReachable => _databaseReachable;
 
   void init() {
-    // Pick up a cached session synchronously so the splash decision works
-    // even if the Firestore profile fetch is mid-flight.
+    // Pick up cached session synchronously
     final fbUser = _repo.firebaseUser;
     if (fbUser != null) {
       _current = AppUser(
@@ -35,10 +34,42 @@ class AuthProvider extends ChangeNotifier {
     }
     _authSub = _repo.authStateChanges().listen(_onAuthChange);
 
-    // Fire-and-forget Firestore probe.
-    _runProbe();
+    // Start real-time connectivity monitoring
+    _startConnectivityMonitoring();
 
     notifyListeners();
+  }
+
+  void _startConnectivityMonitoring() {
+    // Check immediately on start
+    _checkConnectivity();
+
+    // Then listen for changes
+    _connectivitySub = Connectivity()
+        .onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
+      final hasConnection = results.any((r) => r != ConnectivityResult.none);
+      if (hasConnection) {
+        // Has network — verify Firebase is actually reachable
+        _runProbe();
+      } else {
+        // No network at all
+        _databaseReachable = false;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _checkConnectivity() async {
+    final results = await Connectivity().checkConnectivity();
+    final hasConnection =
+        results.any((r) => r != ConnectivityResult.none);
+    if (hasConnection) {
+      await _runProbe();
+    } else {
+      _databaseReachable = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _runProbe() async {
@@ -47,6 +78,8 @@ class AuthProvider extends ChangeNotifier {
     debugPrint('AuthProvider: RTDB reachable = $ok');
     notifyListeners();
   }
+
+  Future<void> recheckConnection() => _checkConnectivity();
 
   Future<void> _onAuthChange(User? user) async {
     if (user == null) {
@@ -73,7 +106,8 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
-    final res = await _repo.signUp(name: name, email: email, password: password);
+    final res =
+        await _repo.signUp(name: name, email: email, password: password);
     if (res.outcome == AuthOutcome.success) {
       _current = res.user;
       notifyListeners();
@@ -99,8 +133,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns true on success, false on failure. Caller should show an error
-  /// snackbar on false.
   Future<bool> completeProfile({
     required String name,
     required String phone,
@@ -127,7 +159,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Returns true on success, false on failure.
   Future<bool> editProfile({
     String? name,
     String? phone,
@@ -156,6 +187,7 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _authSub?.cancel();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 }
