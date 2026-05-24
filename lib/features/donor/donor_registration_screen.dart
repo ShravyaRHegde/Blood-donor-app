@@ -17,8 +17,11 @@ import '../../state/auth_provider.dart';
 import '../../state/donor_provider.dart';
 
 class DonorRegistrationScreen extends StatefulWidget {
-  const DonorRegistrationScreen({super.key});
-
+  final String prefillLastDonation;
+  const DonorRegistrationScreen({
+    super.key,
+    this.prefillLastDonation = '',
+  });
   @override
   State<DonorRegistrationScreen> createState() => _DonorRegistrationScreenState();
 }
@@ -42,6 +45,9 @@ class _DonorRegistrationScreenState extends State<DonorRegistrationScreen> {
       _phone.text = user.phone;
       _location.text = user.location;
     }
+    if (widget.prefillLastDonation.isNotEmpty) {
+     _lastDonation.text = widget.prefillLastDonation;
+     }
     for (final c in [_name, _phone, _location, _lastDonation]) {
       c.addListener(() {
         if (!_dirty) setState(() => _dirty = true);

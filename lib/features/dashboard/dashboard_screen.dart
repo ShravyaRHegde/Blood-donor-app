@@ -3,6 +3,7 @@ import '../nutrition/nutrition_tips_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../donor/donor_prescreening_screen.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -124,13 +125,16 @@ class DashboardScreen extends StatelessWidget {
                               style: AppText.body(color: AppColors.inkMuted, size: 14),
                             ),
                             const SizedBox(height: 22),
+                            // ── Donate — goes through pre-screening first ──
                             _RoleCard(
                               title: 'Donate blood',
                               body: 'Register yourself (or a friend) as a donor. '
                                   'We\'ll show your token to receivers nearby.',
                               icon: Icons.volunteer_activism_outlined,
                               onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const DonorRegistrationScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const DonorPreScreeningScreen(),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -153,35 +157,35 @@ class DashboardScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 34),
-Text('Global impact', style: AppText.title(size: 15)),
-const SizedBox(height: 12),
-StreamBuilder<Map<String, int>>(
-  stream: StatsRepository.stream(),
-  builder: (context, snap) {
-    final data = snap.data ?? {'donors': 0, 'requests': 0, 'donations': 0};
-    return Row(
-      children: [
-        Expanded(child: _StatTile(number: data['donations']!, label: 'Donations completed')),
-        const SizedBox(width: 10),
-        Expanded(child: _StatTile(number: data['donors']!,    label: 'Donors registered')),
-        const SizedBox(width: 10),
-        Expanded(child: _StatTile(number: data['requests']!,  label: 'Requests sent')),
-      ],
-    );
-  },
-),
-if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
-  const SizedBox(height: 20),
-  Text('Your activity', style: AppText.title(size: 15)),
-  const SizedBox(height: 12),
-  Row(
-    children: [
-      Expanded(child: _StatTile(number: activeDonorTokens,  label: 'Active donor tokens')),
-      const SizedBox(width: 10),
-      Expanded(child: _StatTile(number: activeSentRequests, label: 'Open requests sent')),
-    ],
-  ),
-],
+                            Text('Global impact', style: AppText.title(size: 15)),
+                            const SizedBox(height: 12),
+                            StreamBuilder<Map<String, int>>(
+                              stream: StatsRepository.stream(),
+                              builder: (context, snap) {
+                                final data = snap.data ?? {'donors': 0, 'requests': 0, 'donations': 0};
+                                return Row(
+                                  children: [
+                                    Expanded(child: _StatTile(number: data['donations']!, label: 'Donations completed')),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: _StatTile(number: data['donors']!, label: 'Donors registered')),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: _StatTile(number: data['requests']!, label: 'Requests sent')),
+                                  ],
+                                );
+                              },
+                            ),
+                            if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
+                              const SizedBox(height: 20),
+                              Text('Your activity', style: AppText.title(size: 15)),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: _StatTile(number: activeDonorTokens, label: 'Active donor tokens')),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: _StatTile(number: activeSentRequests, label: 'Open requests sent')),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -193,8 +197,9 @@ if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
                 onTap: (a) {
                   switch (a) {
                     case BottomNavAction.donate:
+                      // Bottom nav also goes through pre-screening
                       Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const DonorRegistrationScreen(),
+                        builder: (_) => const DonorPreScreeningScreen(),
                       ));
                       break;
                     case BottomNavAction.receive:
