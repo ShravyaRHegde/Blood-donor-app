@@ -13,6 +13,7 @@ class BloodDonorApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       scrollBehavior: const _NoGlowScrollBehavior(),
+      color: const Color(0xFF6B0F1A), // ← add this line (maroon)
       builder: (context, child) {
         // Clamp text scaling so dense forms never explode on large-font devices.
         final mq = MediaQuery.of(context);

@@ -10,8 +10,10 @@ import '../../shared/widgets/blood_drop.dart';
 import '../../shared/widgets/card_shell.dart';
 import '../../state/auth_provider.dart';
 import '../../state/donor_provider.dart';
+import '../../state/notification_provider.dart';
 import '../../state/request_provider.dart';
 import '../donor/donor_registration_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../receiver/receiver_registration_screen.dart';
 import 'location_sheet.dart';
@@ -27,6 +29,12 @@ class DashboardScreen extends StatelessWidget {
     final isOffline = context.watch<AuthProvider>().databaseReachable == false;
     final donorsMine = context.watch<DonorProvider>().byOwner(user.email);
     final sentRequests = context.watch<RequestProvider>().bySender(user.email);
+    final unreadCount = context.watch<NotificationProvider>().unreadCount;
+
+    // Start notification stream for logged-in user
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().init(user.uid);
+    });
 
     final activeDonorTokens = donorsMine.where((d) => !d.closed).length;
     final activeSentRequests =
@@ -43,41 +51,33 @@ class DashboardScreen extends StatelessWidget {
           bottom: false,
           child: Column(
             children: [
-              // ── Offline banner ──────────────────────────────────────
               if (isOffline)
                 Container(
                   width: double.infinity,
                   color: AppColors.warning,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.wifi_off_rounded,
-                          size: 15, color: AppColors.onMaroon),
+                      const Icon(Icons.wifi_off_rounded, size: 15, color: AppColors.onMaroon),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'No connection to server.',
-                          style: AppText.caption(
-                                  color: AppColors.onMaroon, size: 12)
+                          style: AppText.caption(color: AppColors.onMaroon, size: 12)
                               .copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                       GestureDetector(
-                        onTap: () =>
-                            context.read<AuthProvider>().recheckConnection(),
+                        onTap: () => context.read<AuthProvider>().recheckConnection(),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: AppColors.onMaroon.withOpacity(0.2),
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(2)),
+                            borderRadius: const BorderRadius.all(Radius.circular(2)),
                           ),
                           child: Text(
                             'Retry',
-                            style: AppText.caption(
-                                    color: AppColors.onMaroon, size: 12)
+                            style: AppText.caption(color: AppColors.onMaroon, size: 12)
                                 .copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -85,103 +85,91 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-              // ────────────────────────────────────────────────────────
               Expanded(
-              child: RefreshIndicator(
-                color: AppColors.maroon,
-                onRefresh: () =>
-                    context.read<AuthProvider>().recheckConnection(),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _TopBar(name: user.name),
-                          const SizedBox(height: 22),
-                          _LocationBar(
-                            location: user.location,
-                            onTap: () async {
-                              await showLocationSheet(
-                                context,
-                                initial: user.location,
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 32),
-                          Text(
-                            'How can you help today?',
-                            style: AppText.headline(size: 28),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Pick a role for this session — you can switch anytime.',
-                            style: AppText.body(
-                                color: AppColors.inkMuted, size: 14),
-                          ),
-                          const SizedBox(height: 22),
-                          _RoleCard(
-                            title: 'Donate blood',
-                            body:
-                                'Register yourself (or a friend) as a donor. '
-                                'We\'ll show your token to receivers nearby.',
-                            icon: Icons.volunteer_activism_outlined,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const DonorRegistrationScreen(),
+                child: RefreshIndicator(
+                  color: AppColors.maroon,
+                  onRefresh: () => context.read<AuthProvider>().recheckConnection(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _TopBar(
+                              name: user.name,
+                              unreadCount: unreadCount,
+                              onBellTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const NotificationsScreen(),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          _RoleCard(
-                            title: 'Receive blood',
-                            body:
-                                'Register the patient and we\'ll show compatible '
-                                'donors nearby with a way to reach them.',
-                            icon: Icons.bloodtype_outlined,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const ReceiverRegistrationScreen(),
+                            const SizedBox(height: 22),
+                            _LocationBar(
+                              location: user.location,
+                              onTap: () async {
+                                await showLocationSheet(context, initial: user.location);
+                              },
+                            ),
+                            const SizedBox(height: 32),
+                            Text('How can you help today?', style: AppText.headline(size: 28)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Pick a role for this session — you can switch anytime.',
+                              style: AppText.body(color: AppColors.inkMuted, size: 14),
+                            ),
+                            const SizedBox(height: 22),
+                            _RoleCard(
+                              title: 'Donate blood',
+                              body: 'Register yourself (or a friend) as a donor. '
+                                  'We\'ll show your token to receivers nearby.',
+                              icon: Icons.volunteer_activism_outlined,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const DonorRegistrationScreen()),
                               ),
                             ),
-                          ),
-                          if (activeDonorTokens > 0 ||
-                              activeSentRequests > 0) ...[
-                            const SizedBox(height: 34),
-                            Text('Your activity',
-                                style: AppText.title(size: 15)),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatTile(
-                                    number: activeDonorTokens,
-                                    label: 'Active donor tokens',
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _StatTile(
-                                    number: activeSentRequests,
-                                    label: 'Open requests sent',
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 14),
+                            _RoleCard(
+                              title: 'Receive blood',
+                              body: 'Register the patient and we\'ll show compatible '
+                                  'donors nearby with a way to reach them.',
+                              icon: Icons.bloodtype_outlined,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const ReceiverRegistrationScreen()),
+                              ),
                             ),
+                            if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
+                              const SizedBox(height: 34),
+                              Text('Your activity', style: AppText.title(size: 15)),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _StatTile(
+                                      number: activeDonorTokens,
+                                      label: 'Active donor tokens',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _StatTile(
+                                      number: activeSentRequests,
+                                      label: 'Open requests sent',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-              
               AppBottomNav(
                 onTap: (a) {
                   switch (a) {
@@ -209,11 +197,18 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
   }
-} // ← end of DashboardScreen class
+}
 
 class _TopBar extends StatelessWidget {
   final String name;
-  const _TopBar({required this.name});
+  final int unreadCount;
+  final VoidCallback onBellTap;
+
+  const _TopBar({
+    required this.name,
+    required this.unreadCount,
+    required this.onBellTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +224,33 @@ class _TopBar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
+        GestureDetector(
+          onTap: onBellTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications_outlined, size: 24, color: AppColors.ink),
+              if (unreadCount > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: AppColors.maroon,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: AppText.caption(color: AppColors.onMaroon, size: 9)
+                          .copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
         const BloodDrop(size: 22, color: AppColors.red),
       ],
     );
@@ -254,8 +276,7 @@ class _LocationBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("You're in",
-                    style: AppText.caption(
-                        color: AppColors.inkMuted, size: 11.5)),
+                    style: AppText.caption(color: AppColors.inkMuted, size: 11.5)),
                 const SizedBox(height: 2),
                 Text(
                   location.isEmpty ? 'Set your location' : location,
@@ -266,8 +287,7 @@ class _LocationBar extends StatelessWidget {
               ],
             ),
           ),
-          Text('Change',
-              style: AppText.bodyStrong(color: AppColors.maroon, size: 13)),
+          Text('Change', style: AppText.bodyStrong(color: AppColors.maroon, size: 13)),
         ],
       ),
     );
@@ -333,8 +353,7 @@ class _RoleCard extends StatelessWidget {
           ),
           const Padding(
             padding: EdgeInsets.only(top: 14, left: 6),
-            child: Icon(Icons.arrow_forward_rounded,
-                size: 18, color: AppColors.ink),
+            child: Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.ink),
           ),
         ],
       ),
@@ -360,8 +379,7 @@ class _StatTile extends StatelessWidget {
         children: [
           Text(
             '$number',
-            style: AppText.display(size: 38, color: AppColors.maroon)
-                .copyWith(height: 1.0),
+            style: AppText.display(size: 38, color: AppColors.maroon).copyWith(height: 1.0),
           ),
           const SizedBox(height: 2),
           Text(

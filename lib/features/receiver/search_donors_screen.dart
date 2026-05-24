@@ -34,7 +34,8 @@ class _SearchDonorsScreenState extends State<SearchDonorsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final receiver = context.watch<ReceiverProvider>().byId(widget.receiverTokenId);
+    final receiver =
+        context.watch<ReceiverProvider>().byId(widget.receiverTokenId);
     if (receiver == null) {
       return const _MissingReceiverScaffold();
     }
@@ -56,8 +57,10 @@ class _SearchDonorsScreenState extends State<SearchDonorsScreen> {
           return b.createdAt.compareTo(a.createdAt);
         case _SortBy.location:
           final inCity = receiver.location.split(',').first.trim();
-          final aMatch = a.location.toLowerCase().contains(inCity.toLowerCase());
-          final bMatch = b.location.toLowerCase().contains(inCity.toLowerCase());
+          final aMatch =
+              a.location.toLowerCase().contains(inCity.toLowerCase());
+          final bMatch =
+              b.location.toLowerCase().contains(inCity.toLowerCase());
           if (aMatch && !bMatch) return -1;
           if (!aMatch && bMatch) return 1;
           return b.createdAt.compareTo(a.createdAt);
@@ -78,8 +81,7 @@ class _SearchDonorsScreenState extends State<SearchDonorsScreen> {
           _FiltersBar(
             compatibleOnly: _compatibleOnly,
             sort: _sort,
-            onCompatibleChanged: (v) =>
-                setState(() => _compatibleOnly = v),
+            onCompatibleChanged: (v) => setState(() => _compatibleOnly = v),
             onSortChanged: (s) => setState(() => _sort = s),
           ),
           Expanded(
@@ -116,20 +118,21 @@ class _SearchDonorsScreenState extends State<SearchDonorsScreen> {
                         onSend: () async {
                           final user = context.read<AuthProvider>().current;
                           if (user == null) return;
-                          // Re-check inside onSend in case user double-taps:
-                          // activeBetween is read in build, so a stale card
-                          // could try to send twice on the same pair.
-                          final already = context.read<RequestProvider>().activeBetween(
-                                donorTokenId: d.id,
-                                receiverTokenId: receiver.id,
-                              );
+                          final already =
+                              context.read<RequestProvider>().activeBetween(
+                                    donorTokenId: d.id,
+                                    receiverTokenId: receiver.id,
+                                  );
                           if (already != null) return;
-                          final req = await context.read<RequestProvider>().send(
-                                donorTokenId: d.id,
-                                receiverTokenId: receiver.id,
-                                senderEmail: user.email,
-                                recipientEmail: d.ownerEmail,
-                              );
+                          final req =
+                              await context.read<RequestProvider>().send(
+                                    donorTokenId: d.id,
+                                    receiverTokenId: receiver.id,
+                                    senderEmail: user.email,
+                                    recipientEmail: d.ownerEmail,
+                                    receiverName: receiver.name,
+                                    donorName: d.name,
+                                  );
                           if (!context.mounted) return;
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -190,7 +193,8 @@ class _ReceiverRibbon extends StatelessWidget {
                     text: '${receiver.unitsNeeded} unit'
                         '${receiver.unitsNeeded > 1 ? 's' : ''} of '
                         '${receiver.bloodGroup}',
-                    style: AppText.bodyStrong(color: AppColors.maroon, size: 13.5),
+                    style:
+                        AppText.bodyStrong(color: AppColors.maroon, size: 13.5),
                   ),
                   TextSpan(text: ' · ${receiver.location}'),
                 ],
@@ -296,9 +300,12 @@ class _SortMenu extends StatelessWidget {
 
   String _label(_SortBy s) {
     switch (s) {
-      case _SortBy.recency:     return 'Newest';
-      case _SortBy.location:    return 'Nearby';
-      case _SortBy.bloodGroup:  return 'Blood group';
+      case _SortBy.recency:
+        return 'Newest';
+      case _SortBy.location:
+        return 'Nearby';
+      case _SortBy.bloodGroup:
+        return 'Blood group';
     }
   }
 
@@ -386,7 +393,8 @@ class _DonorCard extends StatelessWidget {
                 ),
                 child: Text(
                   donor.bloodGroup,
-                  style: AppText.bodyStrong(color: AppColors.onMaroon, size: 12),
+                  style:
+                      AppText.bodyStrong(color: AppColors.onMaroon, size: 12),
                 ),
               ),
             ],

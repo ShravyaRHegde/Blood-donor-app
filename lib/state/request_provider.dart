@@ -67,17 +67,21 @@ class RequestProvider extends ChangeNotifier {
   }
 
   Future<BloodRequest> send({
-    required String donorTokenId,
-    required String receiverTokenId,
-    required String senderEmail,
-    required String recipientEmail,
-  }) =>
-      _repo.create(
-        donorTokenId: donorTokenId,
-        receiverTokenId: receiverTokenId,
-        senderEmail: senderEmail,
-        recipientEmail: recipientEmail,
-      );
+  required String donorTokenId,
+  required String receiverTokenId,
+  required String senderEmail,
+  required String recipientEmail,
+  required String receiverName,
+  required String donorName,
+}) =>
+    _repo.create(
+      donorTokenId: donorTokenId,
+      receiverTokenId: receiverTokenId,
+      senderEmail: senderEmail,
+      recipientEmail: recipientEmail,
+      receiverName: receiverName,
+      donorName: donorName,
+    );
 
   Future<BloodRequest> advance(String id, RequestStatus next) =>
       _repo.updateStatus(id, next);

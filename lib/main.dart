@@ -13,6 +13,7 @@ import 'state/auth_provider.dart';
 import 'state/donor_provider.dart';
 import 'state/receiver_provider.dart';
 import 'state/request_provider.dart';
+import 'state/notification_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => DonorProvider()..init()),
         ChangeNotifierProvider(create: (_) => ReceiverProvider()..init()),
         ChangeNotifierProvider(create: (_) => RequestProvider()..init()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: const BloodDonorApp(),
     ),

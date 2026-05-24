@@ -237,4 +237,23 @@ class AuthRepository {
       return false;
     }
   }
+
+  /// Finds a user's uid by their email.
+  Future<String?> uidByEmail(String email) async {
+    try {
+      final snap = await _db
+          .ref('users')
+          .orderByChild('email')
+          .equalTo(email.toLowerCase())
+          .get()
+          .timeout(_ioTimeout);
+      if (snap.value == null) return null;
+      final map = Map<dynamic, dynamic>.from(snap.value as Map);
+      return map.keys.first as String?;
+    } catch (e) {
+      debugPrint('AuthRepository.uidByEmail failed: $e');
+      return null;
+    }
+  }
+
 }
