@@ -18,6 +18,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _minDelayDone = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,13 +28,24 @@ class _SplashScreenState extends State<SplashScreen> {
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
     ));
-    _advance();
+    // Minimum 2 second splash display
+    Future.delayed(const Duration(milliseconds: 2000), () {
+      if (mounted) {
+        setState(() => _minDelayDone = true);
+        _tryAdvance();
+      }
+    });
   }
 
-  Future<void> _advance() async {
-    await Future.delayed(const Duration(milliseconds: 2000));
+  void _tryAdvance() {
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
+    // Wait until both min delay is done AND hydration is complete
+    if (!_minDelayDone || auth.isHydrating) return;
+    _advance(auth);
+  }
+
+  void _advance(AuthProvider auth) {
     Widget next;
     if (!auth.isSignedIn) {
       next = const LoginScreen();
@@ -51,14 +64,18 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for hydration completion
+    final auth = context.watch<AuthProvider>();
+    if (_minDelayDone && !auth.isHydrating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryAdvance());
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(
-            painter: _SplashBackdropPainter(),
-          ),
+          CustomPaint(painter: _SplashBackdropPainter()),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(32, 0, 32, 48),
@@ -74,7 +91,8 @@ class _SplashScreenState extends State<SplashScreen> {
                           color: AppColors.red,
                           borderRadius: BorderRadius.all(Radius.circular(2)),
                         ),
-                        child: const BloodDrop(size: 28, color: AppColors.onMaroon),
+                        child:
+                            const BloodDrop(size: 28, color: AppColors.onMaroon),
                       ),
                     ],
                   ),
@@ -109,9 +127,6 @@ class _SplashBackdropPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-
-    // Single deep bloom in the top-right quadrant — enough silhouette to
-    // feel intentional without the five-circle AI-decor cluster.
     canvas.drawCircle(
       Offset(w * 1.05, -h * 0.06),
       w * 0.55,

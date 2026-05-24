@@ -15,45 +15,38 @@ class AuthProvider extends ChangeNotifier {
   AppUser? _current;
   AppUser? get current => _current;
   bool get isSignedIn => _current != null;
-  bool get needsProfileSetup => _current != null && !_current!.profileComplete;
+  bool get needsProfileSetup =>
+      _current != null && !_current!.profileComplete;
+
+  // True while we are fetching the profile from RTDB on startup.
+  // Splash screen waits for this to be false before deciding where to go.
+  bool _hydrating = false;
+  bool get isHydrating => _hydrating;
 
   bool? _databaseReachable;
   bool? get databaseReachable => _databaseReachable;
 
   void init() {
-    // Pick up cached session synchronously
     final fbUser = _repo.firebaseUser;
     if (fbUser != null) {
-      _current = AppUser(
-        uid: fbUser.uid,
-        email: fbUser.email ?? '',
-        name: '',
-        createdAt: DateTime.now(),
-      );
+      // Don't create a stub — just set hydrating and wait for real profile
+      _hydrating = true;
       _hydrateProfile(fbUser.uid);
     }
     _authSub = _repo.authStateChanges().listen(_onAuthChange);
-
-    // Start real-time connectivity monitoring
     _startConnectivityMonitoring();
-
     notifyListeners();
   }
 
   void _startConnectivityMonitoring() {
-    // Check immediately on start
     _checkConnectivity();
-
-    // Then listen for changes
     _connectivitySub = Connectivity()
         .onConnectivityChanged
         .listen((List<ConnectivityResult> results) {
       final hasConnection = results.any((r) => r != ConnectivityResult.none);
       if (hasConnection) {
-        // Has network — verify Firebase is actually reachable
         _runProbe();
       } else {
-        // No network at all
         _databaseReachable = false;
         notifyListeners();
       }
@@ -62,8 +55,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _checkConnectivity() async {
     final results = await Connectivity().checkConnectivity();
-    final hasConnection =
-        results.any((r) => r != ConnectivityResult.none);
+    final hasConnection = results.any((r) => r != ConnectivityResult.none);
     if (hasConnection) {
       await _runProbe();
     } else {
@@ -75,7 +67,6 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _runProbe() async {
     final ok = await _repo.probeDatabase();
     _databaseReachable = ok;
-    debugPrint('AuthProvider: RTDB reachable = $ok');
     notifyListeners();
   }
 
@@ -84,19 +75,28 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _onAuthChange(User? user) async {
     if (user == null) {
       _current = null;
+      _hydrating = false;
       notifyListeners();
       return;
     }
     if (_current?.uid == user.uid && _current?.profileComplete == true) {
       return;
     }
+    _hydrating = true;
+    notifyListeners();
     await _hydrateProfile(user.uid);
   }
 
   Future<void> _hydrateProfile(String uid) async {
-    final profile = await _repo.fetchProfile(uid);
-    if (profile != null) {
-      _current = profile;
+    try {
+      final profile = await _repo.fetchProfile(uid);
+      if (profile != null) {
+        _current = profile;
+      }
+    } catch (e) {
+      debugPrint('AuthProvider._hydrateProfile failed: $e');
+    } finally {
+      _hydrating = false;
       notifyListeners();
     }
   }
