@@ -1,3 +1,4 @@
+import 'stats_repository.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../core/utils/id_generator.dart';
@@ -38,5 +39,6 @@ class DonorRepository {
       'closed': true,
       'acceptedRequestId': requestId,
     }).timeout(const Duration(seconds: 8));
+    unawaited(StatsRepository.increment('donors'));
   }
 }

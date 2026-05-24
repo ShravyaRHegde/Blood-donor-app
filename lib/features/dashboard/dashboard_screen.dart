@@ -1,3 +1,5 @@
+import '../../data/repositories/stats_repository.dart';
+import '../nutrition/nutrition_tips_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -141,28 +143,45 @@ class DashboardScreen extends StatelessWidget {
                                 MaterialPageRoute(builder: (_) => const ReceiverRegistrationScreen()),
                               ),
                             ),
-                            if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
-                              const SizedBox(height: 34),
-                              Text('Your activity', style: AppText.title(size: 15)),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _StatTile(
-                                      number: activeDonorTokens,
-                                      label: 'Active donor tokens',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _StatTile(
-                                      number: activeSentRequests,
-                                      label: 'Open requests sent',
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 14),
+                            _RoleCard(
+                              title: 'Nutrition Tips',
+                              body: 'What to eat before and after donation, and general health tips for donors.',
+                              icon: Icons.restaurant_menu_outlined,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const NutritionTipsScreen()),
                               ),
-                            ],
+                            ),
+                            const SizedBox(height: 34),
+Text('Global impact', style: AppText.title(size: 15)),
+const SizedBox(height: 12),
+StreamBuilder<Map<String, int>>(
+  stream: StatsRepository.stream(),
+  builder: (context, snap) {
+    final data = snap.data ?? {'donors': 0, 'requests': 0, 'donations': 0};
+    return Row(
+      children: [
+        Expanded(child: _StatTile(number: data['donations']!, label: 'Donations completed')),
+        const SizedBox(width: 10),
+        Expanded(child: _StatTile(number: data['donors']!,    label: 'Donors registered')),
+        const SizedBox(width: 10),
+        Expanded(child: _StatTile(number: data['requests']!,  label: 'Requests sent')),
+      ],
+    );
+  },
+),
+if (activeDonorTokens > 0 || activeSentRequests > 0) ...[
+  const SizedBox(height: 20),
+  Text('Your activity', style: AppText.title(size: 15)),
+  const SizedBox(height: 12),
+  Row(
+    children: [
+      Expanded(child: _StatTile(number: activeDonorTokens,  label: 'Active donor tokens')),
+      const SizedBox(width: 10),
+      Expanded(child: _StatTile(number: activeSentRequests, label: 'Open requests sent')),
+    ],
+  ),
+],
                           ],
                         ),
                       ),

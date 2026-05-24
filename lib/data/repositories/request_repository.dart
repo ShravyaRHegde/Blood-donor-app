@@ -1,3 +1,4 @@
+import 'stats_repository.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../core/utils/id_generator.dart';
@@ -36,7 +37,7 @@ class RequestRepository {
         .ref('requests/${req.id}')
         .set(req.toMap())
         .timeout(const Duration(seconds: 8));
-
+    unawaited(StatsRepository.increment('requests'));
     // Notify the donor that a request was received
     final donorUid = await _authRepo.uidByEmail(recipientEmail);
     if (donorUid != null) {
@@ -160,6 +161,7 @@ class RequestRepository {
           break;
 
         case RequestStatus.completed:
+          unawaited(StatsRepository.increment('donations'));
           final receiverUid =
               await _authRepo.uidByEmail(existing.senderEmail);
           if (receiverUid != null) {
