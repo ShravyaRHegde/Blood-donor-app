@@ -20,7 +20,7 @@ import '../profile/profile_screen.dart';
 import '../receiver/receiver_registration_screen.dart';
 import 'location_sheet.dart';
 import '../hospitals/hospital_finder_screen.dart';
-
+import '../../shared/widgets/app_drawer.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -50,6 +50,7 @@ class DashboardScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: AppColors.surface,
+        drawer: const AppDrawer(),
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -250,6 +251,14 @@ class _TopBar extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        Builder(
+          builder: (ctx) => InkResponse(
+            onTap: () => Scaffold.of(ctx).openDrawer(),
+            radius: 22,
+            child: const Icon(Icons.menu_rounded, size: 22, color: AppColors.ink),
+          ),
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             'Hello, $firstName.',
