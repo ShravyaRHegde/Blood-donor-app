@@ -15,11 +15,11 @@ import '../../state/auth_provider.dart';
 import '../../state/donor_provider.dart';
 import '../../state/notification_provider.dart';
 import '../../state/request_provider.dart';
-import '../donor/donor_registration_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../receiver/receiver_registration_screen.dart';
 import 'location_sheet.dart';
+import '../hospitals/hospital_finder_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -149,12 +149,22 @@ class DashboardScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 14),
                             _RoleCard(
+                              title: 'Find Hospitals',
+                              body: 'Locate nearby hospitals with blood banks, emergency and specialty care.',
+                              icon: Icons.local_hospital_outlined,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const HospitalFinderScreen()),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _RoleCard(
                               title: 'Nutrition Tips',
                               body: 'What to eat before and after donation, and general health tips for donors.',
                               icon: Icons.restaurant_menu_outlined,
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => const NutritionTipsScreen()),
                               ),
+                            
                             ),
                             const SizedBox(height: 34),
                             Text('Global impact', style: AppText.title(size: 15)),
