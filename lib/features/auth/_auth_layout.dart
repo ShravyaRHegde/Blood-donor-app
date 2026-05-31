@@ -39,6 +39,7 @@ class AuthLayout extends StatelessWidget {
             SafeArea(
               child: Column(
                 children: [
+                  // REPLACE WITH:
                   SizedBox(
                     height: 52,
                     child: Row(
@@ -56,7 +57,7 @@ class AuthLayout extends StatelessWidget {
                         const Spacer(),
                         Padding(
                           padding: const EdgeInsets.only(right: 16),
-                          child: const BloodDrop(size: 22, color: AppColors.onMaroon),
+                          child: BloodDrop(size: 22, color: AppColors.onMaroon),
                         ),
                       ],
                     ),
@@ -114,11 +115,7 @@ class _AuthBackdropPainter extends CustomPainter {
       w * 0.55,
       Paint()..color = AppColors.maroonDeep,
     );
-    canvas.drawCircle(
-      Offset(w * 0.94, h * 0.06),
-      w * 0.05,
-      Paint()..color = AppColors.red,
-    );
+    
   }
 
   @override

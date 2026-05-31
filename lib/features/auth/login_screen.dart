@@ -11,6 +11,7 @@ import '../dashboard/dashboard_screen.dart';
 import '_auth_layout.dart';
 import 'profile_setup_screen.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,83 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _showForgotPassword() async {
-    final controller = TextEditingController(text: _email.text);
-    String? emailToReset;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(2)),
-        ),
-        title: Text('Reset password', style: AppText.title(size: 18)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter your email and we\'ll send a reset link.',
-              style: AppText.body(color: AppColors.inkMuted, size: 13.5),
-            ),
-            const SizedBox(height: 16),
-            // Plain TextFormField — no inherited theme issues
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.emailAddress,
-              autofocus: true,
-              style: AppText.body(color: AppColors.ink, size: 15),
-              cursorColor: AppColors.maroon,
-              decoration: InputDecoration(
-                hintText: 'your@email.com',
-                hintStyle: AppText.body(color: AppColors.inkFaint, size: 15),
-                filled: true,
-                fillColor: AppColors.surfaceMuted,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                border: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(2)),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: const BorderRadius.all(Radius.circular(2)),
-                  borderSide: BorderSide(color: AppColors.maroon, width: 1.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel',
-                style: AppText.button(color: AppColors.inkMuted, size: 13)),
-          ),
-          TextButton(
-            onPressed: () {
-              emailToReset = controller.text.trim();
-              Navigator.of(ctx).pop();
-            },
-            child: Text('Send link',
-                style: AppText.button(color: AppColors.maroon, size: 13)),
-          ),
-        ],
-      ),
-    );
-
-    controller.dispose();
-
-    if (emailToReset != null && emailToReset!.isNotEmpty && mounted) {
-      final ok = await context.read<AuthProvider>().sendPasswordReset(emailToReset!);
-      if (mounted) {
-        _snack(ok
-            ? 'Reset link sent — check your email'
-            : 'Could not send link — check the email address');
-      }
-    }
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -184,7 +108,9 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: _showForgotPassword,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                ),
                 child: Text(
                   'Forgot password?',
                   style: AppText.body(color: AppColors.onMaroonMuted, size: 13)

@@ -90,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         width: 56,
                         height: 56,
                         decoration: const BoxDecoration(
-                          color: AppColors.red,
+                          color: Color.fromARGB(255, 102, 15, 26),
                           borderRadius: BorderRadius.all(Radius.circular(2)),
                         ),
                         alignment: Alignment.center,
