@@ -85,14 +85,16 @@ class _SplashScreenState extends State<SplashScreen> {
                 children: [
                   Row(
                     children: [
+                      // REPLACE WITH:
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        width: 56,
+                        height: 56,
                         decoration: const BoxDecoration(
                           color: AppColors.red,
                           borderRadius: BorderRadius.all(Radius.circular(2)),
                         ),
-                        child:
-                            const BloodDrop(size: 28, color: AppColors.onMaroon),
+                        alignment: Alignment.center,
+                        child: const BloodDrop(size: 28, color: AppColors.onMaroon),
                       ),
                     ],
                   ),

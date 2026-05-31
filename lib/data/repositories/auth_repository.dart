@@ -238,6 +238,17 @@ class AuthRepository {
     }
   }
 
+  Future<bool> sendPasswordReset(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase())
+          .timeout(_authTimeout);
+      return true;
+    } catch (e) {
+      debugPrint('sendPasswordReset failed: $e');
+      return false;
+    }
+  }
+
   /// Finds a user's uid by their email.
   Future<String?> uidByEmail(String email) async {
     try {

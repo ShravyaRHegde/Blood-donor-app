@@ -159,6 +159,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> sendPasswordReset(String email) =>
+    _repo.sendPasswordReset(email);
+
   Future<bool> editProfile({
     String? name,
     String? phone,

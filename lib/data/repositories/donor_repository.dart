@@ -31,6 +31,8 @@ class DonorRepository {
         .child(token.id)
         .set(token.toMap())
         .timeout(const Duration(seconds: 8));
+    unawaited(StatsRepository.increment('donors')); // ← ADD THIS LINE
+
     return token;
   }
 
