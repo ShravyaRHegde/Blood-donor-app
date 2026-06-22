@@ -7,7 +7,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import 'app_text_field.dart';
 
-/// Text + autocomplete + GPS button. On tap-out, hides suggestions.
 class LocationField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
@@ -70,16 +69,19 @@ class _LocationFieldState extends State<LocationField> {
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.low),
       );
-      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final placemarks =
+          await placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
         final city = p.locality?.trim().isNotEmpty == true
             ? p.locality!.trim()
             : (p.subAdministrativeArea ?? '').trim();
         final state = (p.administrativeArea ?? '').trim();
-        final text = [city, state].where((s) => s.isNotEmpty).join(', ');
+        final text =
+            [city, state].where((s) => s.isNotEmpty).join(', ');
         if (text.isNotEmpty) {
           widget.controller.text = text;
           widget.onChanged?.call(text);
@@ -96,7 +98,8 @@ class _LocationFieldState extends State<LocationField> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -114,22 +117,29 @@ class _LocationFieldState extends State<LocationField> {
               _update(v);
               widget.onChanged?.call(v);
             },
-            trailing: _GpsButton(loading: _fetchingGps, onPressed: _useGps),
+            trailing:
+                _GpsButton(loading: _fetchingGps, onPressed: _useGps),
           ),
           if (_suggestions.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: AppColors.hairline),
-                  right: BorderSide(color: AppColors.hairline),
-                  bottom: BorderSide(color: AppColors.hairline),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 150),
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: AppColors.hairline),
+                    right: BorderSide(color: AppColors.hairline),
+                    bottom: BorderSide(color: AppColors.hairline),
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _suggestions
-                    .map((s) => InkWell(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  physics: const ClampingScrollPhysics(),
+                  children: _suggestions
+                      .take(4)
+                      .map(
+                        (s) => InkWell(
                           onTap: () {
                             widget.controller.text = s;
                             widget.onChanged?.call(s);
@@ -137,12 +147,14 @@ class _LocationFieldState extends State<LocationField> {
                             setState(() => _suggestions = const []);
                           },
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 10),
                             child: Text(s, style: AppText.body()),
                           ),
-                        ))
-                    .toList(),
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
             ),
           ],
