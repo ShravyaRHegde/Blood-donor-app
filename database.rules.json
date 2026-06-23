@@ -4,13 +4,18 @@
     ".read":  true,
     ".write": true,
 
+    "users": {
+      ".indexOn": ["email"]
+    },
+
     "_production_template": {
       "_note": "Replace the top-level .read/.write above with this nested template for production.",
       "users": {
         "$uid": {
           ".read":  "auth != null && auth.uid == $uid",
           ".write": "auth != null && auth.uid == $uid"
-        }
+        },
+        ".indexOn": ["email"]
       },
       "donors": {
         ".read":  true,

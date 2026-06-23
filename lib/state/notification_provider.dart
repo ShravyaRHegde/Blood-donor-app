@@ -10,8 +10,10 @@ class NotificationProvider extends ChangeNotifier {
   StreamSubscription<List<AppNotification>>? _sub;
 
   List<AppNotification> _notifications = const [];
+  String? _currentUid;
 
   List<AppNotification> get all => _notifications;
+  String? get currentUid => _currentUid;
 
   int get unreadCount =>
       _notifications.where((n) => !n.read).length;
@@ -19,8 +21,11 @@ class NotificationProvider extends ChangeNotifier {
   bool get hasUnread => unreadCount > 0;
 
   /// Call this after the user logs in with their Firebase uid.
+  /// Skips re-initialisation if already listening for the same uid.
   void init(String uid) {
+    if (_currentUid == uid) return;
     _sub?.cancel();
+    _currentUid = uid;
     _notifications = const [];
     _sub = _repo.stream(uid).listen((list) {
       _notifications = list;
@@ -32,6 +37,7 @@ class NotificationProvider extends ChangeNotifier {
   void clear() {
     _sub?.cancel();
     _sub = null;
+    _currentUid = null;
     _notifications = const [];
     notifyListeners();
   }

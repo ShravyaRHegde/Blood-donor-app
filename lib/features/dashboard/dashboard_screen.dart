@@ -21,6 +21,7 @@ import '../receiver/receiver_registration_screen.dart';
 import 'location_sheet.dart';
 import '../hospitals/hospital_finder_screen.dart';
 import '../../shared/widgets/app_drawer.dart';
+
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -34,9 +35,13 @@ class DashboardScreen extends StatelessWidget {
     final sentRequests = context.watch<RequestProvider>().bySender(user.email);
     final unreadCount = context.watch<NotificationProvider>().unreadCount;
 
-    // Start notification stream for logged-in user
+    // Only initialise the notification stream when the uid actually changes —
+    // calling init() on every build previously caused listener churn.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().init(user.uid);
+      final notifProv = context.read<NotificationProvider>();
+      if (notifProv.currentUid != user.uid) {
+        notifProv.init(user.uid);
+      }
     });
 
     final activeDonorTokens = donorsMine.where((d) => !d.closed).length;
@@ -126,7 +131,6 @@ class DashboardScreen extends StatelessWidget {
                               style: AppText.body(color: AppColors.inkMuted, size: 14),
                             ),
                             const SizedBox(height: 22),
-                            // ── Donate — goes through pre-screening first ──
                             _RoleCard(
                               title: 'Donate blood',
                               body: 'Register yourself (or a friend) as a donor. '
@@ -165,7 +169,6 @@ class DashboardScreen extends StatelessWidget {
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => const NutritionTipsScreen()),
                               ),
-                            
                             ),
                             const SizedBox(height: 34),
                             Text('Global impact', style: AppText.title(size: 15)),
@@ -208,7 +211,6 @@ class DashboardScreen extends StatelessWidget {
                 onTap: (a) {
                   switch (a) {
                     case BottomNavAction.donate:
-                      // Bottom nav also goes through pre-screening
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const DonorPreScreeningScreen(),
                       ));
